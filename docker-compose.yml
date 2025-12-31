@@ -1,0 +1,40 @@
+version: '3.9'
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: db
+    environment:
+      SA_PASSWORD: "StrongPass!123"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - app-network
+
+  backend:
+    build: .
+    container_name: nodeapp
+    ports:
+      - "4425:4425"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: StrongPass!123
+      DB_NAME: navision_consulting
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+
+volumes:
+  mssql-data:
+
+networks:
+  app-network:  
+    driver: bridge

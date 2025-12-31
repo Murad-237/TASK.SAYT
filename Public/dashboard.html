@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8">
+  <title>Müştəri Paneli</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="dashboardBtnContainer">
+    <h2>👋 Xoş gəldiniz, <span id="usernameDisplay"></span></h2>
+    <button id="getCompaniesBtn">Şirkətləri göstər</button>
+    <button id="addCompanyBtn">Şirkət əlavə et</button>
+  </div>
+
+  <div id="companiesContainer">
+    <div id="companiesList"></div>
+  </div>
+
+  <!-- Modal (Güncelleme) -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeModal" class="close">&times;</span>
+      <h3>Şirkət məlumatları</h3>
+      <div><strong>ID:</strong> <span id="idofCompany"></span></div>
+      <div><strong>Ad:</strong> <span id="nameofCompany" contenteditable="true"></span></div>
+      <div class="modal-buttons">
+        <button id="deleteCompanyBtn">Sil</button>
+        <button id="saveCompanyBtn">Yadda saxla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal (Ekleme) -->
+  <div id="addModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeAddModal" class="close">&times;</span>
+      <h3>Yeni Şirkət əlavə et</h3>
+      <input id="newCompanyName" type="text" placeholder="Şirkət adı">
+      <button id="okAddCompanyBtn">OK</button>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("authToken");
+
+
+    async function checkToken() {
+      if (!token) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/tokenCheck", {
+          headers: { "X-Authorization": token }
+        });
+
+        if (res.status !== 200) {
+          window.location.href = "index.html";
+        }
+      } catch (err) {
+        console.error(err);
+        window.location.href = "index.html";
+      }
+    }
+
+    checkToken(); 
+
+    const username = localStorage.getItem("username");
+    const usernameDisplay = document.getElementById("usernameDisplay");
+    const companiesList = document.getElementById("companiesList");
+    const modal = document.getElementById("modal");
+    const closeModal = document.getElementById("closeModal");
+    const idofCompany = document.getElementById("idofCompany");
+    const nameofCompany = document.getElementById("nameofCompany");
+    const saveCompanyBtn = document.getElementById("saveCompanyBtn");
+    const deleteCompanyBtn = document.getElementById("deleteCompanyBtn");
+    const addCompanyBtn = document.getElementById("addCompanyBtn");
+    const addModal = document.getElementById("addModal");
+    const closeAddModal = document.getElementById("closeAddModal");
+    const newCompanyName = document.getElementById("newCompanyName");
+    const okAddCompanyBtn = document.getElementById("okAddCompanyBtn");
+
+    usernameDisplay.textContent = username || "Anonim";
+
+
+    closeModal.onclick = () => modal.classList.add("hidden");
+    closeAddModal.onclick = () => addModal.classList.add("hidden");
+    window.onclick = (e) => {
+      if (e.target === modal) modal.classList.add("hidden");
+      if (e.target === addModal) addModal.classList.add("hidden");
+    };
+
+
+    async function loadCompanies() {
+      try {
+        const res = await fetch("/api/companies", { headers: { "X-Authorization": token } });
+        const data = await res.json();
+        companiesList.innerHTML = "";
+        data.forEach(company => {
+          const div = document.createElement("div");
+          div.classList.add("panel-item");
+          div.textContent = company.customerName || "Ad yoxdur";
+          div.dataset.id = company.customerID;
+          div.onclick = () => showCompanyDetail(company);
+          companiesList.appendChild(div);
+        });
+      } catch (err) {
+        console.error(err);
+        alert("Şirkətləri gətirərkən xəta baş verdi");
+      }
+    }
+
+    document.getElementById("getCompaniesBtn").addEventListener("click", loadCompanies);
+
+    function showCompanyDetail(company) {
+      idofCompany.textContent = company.customerID;
+      nameofCompany.textContent = company.customerName;
+      modal.classList.remove("hidden");
+    }
+
+
+    saveCompanyBtn.onclick = async () => {
+      const companyID = idofCompany.textContent;
+      const companyName = nameofCompany.textContent.trim();
+      try {
+        const res = await fetch("/api/updateCompanyData", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "X-Authorization": token },
+          body: JSON.stringify({ customerID: companyID, companyName })
+        });
+        const data = await res.json();
+        alert(data.message);
+        if (res.ok) loadCompanies();
+      } catch (err) {
+        console.error(err);
+        alert("Server ilə bağlantı xətası");
+      }
+    };
+
+
+    deleteCompanyBtn.onclick = async () => {
+      const customerID = idofCompany.textContent;
+      try {
+        const res = await fetch("/api/deleteCompany", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Authorization": token },
+          body: JSON.stringify({ customerID })
+        });
+        const data = await res.json();
+        alert(data.message);
+        if (res.ok) loadCompanies();
+        modal.classList.add("hidden");
+      } catch (err) {
+        console.error(err);
+        alert("Server ilə bağlantı xətası");
+      }
+    };
+
+    addCompanyBtn.onclick = () => addModal.classList.remove("hidden");
+    okAddCompanyBtn.onclick = async () => {
+      const companyName = newCompanyName.value.trim();
+      if (!companyName) return alert("Şirkət adı boş ola bilməz");
+      try {
+        const res = await fetch("/api/insertCompany", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Authorization": token },
+          body: JSON.stringify({ companyName })
+        });
+        const data = await res.json();
+        alert(data.message);
+        if (res.ok) loadCompanies();
+        addModal.classList.add("hidden");
+        newCompanyName.value = "";
+      } catch (err) {
+        console.error(err);
+        alert("Server ilə bağlantı xətası");
+      }
+    };
+  </script>
+</body>
+</html>
